@@ -1,0 +1,3 @@
+PyQt6>=6.6
+pywin32>=306
+types-pywin32  # type stubs for pywin32 (win32con, win32gui, etc.) for basedpyright/pyright

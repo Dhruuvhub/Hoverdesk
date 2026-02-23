@@ -1,0 +1,6 @@
+{
+    "mode": "experimental",
+    "idle_time": 3,
+    "enabled": true,
+    "fade_duration": 200
+}
