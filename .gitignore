@@ -1,0 +1,21 @@
+# Environment
+venv/
+vnew/
+.env
+
+# Cache
+__pycache__/
+*.pyc
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# IDEs
+.vscode/
+.idea/
+
+# Other
+old_code_backup.zip
+*.log

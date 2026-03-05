@@ -6,9 +6,9 @@ import win32gui
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QSystemTrayIcon, QMenu, QSlider, QCheckBox,
-    QRadioButton, QButtonGroup
+    QRadioButton, QButtonGroup, QGroupBox, QToolTip
 )
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QCursor
 from PyQt6.QtCore import Qt, QSharedMemory, QTimer
 
 from config import load_config, save_config
@@ -206,94 +206,276 @@ class MainWindow(QWidget):
         super().__init__()
         self.engine = engine
         self.setWindowTitle('HoverDesk')
-        self.setGeometry(600, 300, 420, 320)
+        self.setWindowIcon(QIcon('icon.ico'))
+        self.setMinimumSize(500, 500)
         self.cfg = load_config()
         
+        # Apply Global Stylesheet
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #1E1E1E;
+                color: #FFFFFF;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 13px;
+            }
+            QGroupBox {
+                background-color: #2A2A2A;
+                border: 1px solid #3A3A3A;
+                border-radius: 8px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 2px 8px;
+                color: #A0A0A0;
+                font-size: 11px;
+                font-weight: bold;
+                left: 10px;
+            }
+            QPushButton {
+                background-color: #333333;
+                border: 1px solid #444444;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #404040;
+                border: 1px solid #555555;
+            }
+            QPushButton:pressed {
+                background-color: #222222;
+            }
+            QPushButton#applyBtn {
+                background-color: #3DAEE9;
+                border: none;
+                color: white;
+            }
+            QPushButton#applyBtn:hover {
+                background-color: #4FC3F7;
+            }
+            QPushButton#applyBtn:pressed {
+                background-color: #2980B9;
+            }
+            QSlider::groove:horizontal {
+                border: 1px solid #4A4A4A;
+                height: 4px;
+                background: #3A3A3A;
+                border-radius: 2px;
+            }
+            QSlider::handle:horizontal {
+                background: #3DAEE9;
+                border: none;
+                width: 16px;
+                margin: -6px 0;
+                border-radius: 8px;
+            }
+            QSlider::handle:horizontal:hover {
+                background: #4FC3F7;
+            }
+            QCheckBox {
+                background: transparent;
+                spacing: 8px;
+            }
+            QRadioButton {
+                background: transparent;
+                spacing: 8px;
+            }
+            QRadioButton::indicator {
+                width: 16px;
+                height: 16px;
+                border: 2px solid #555555;
+                border-radius: 10px;
+                background: transparent;
+            }
+            QRadioButton::indicator:hover {
+                border-color: #3DAEE9;
+            }
+            QRadioButton::indicator:checked {
+                border: 2px solid #3DAEE9;
+                background: #3DAEE9;
+            }
+            QGroupBox QLabel {
+                background: transparent;
+            }
+            QGroupBox QSlider {
+                background: transparent;
+            }
+            QLabel#titleLabel {
+                font-size: 18px;
+                font-weight: bold;
+                color: #FFFFFF;
+                background: transparent;
+            }
+            QLabel#subtitleLabel {
+                font-size: 12px;
+                color: #A0A0A0;
+                background: transparent;
+            }
+        """)
+        
         layout = QVBoxLayout()
-        layout.addWidget(QLabel('HoverDesk Settings Panel'))
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
 
-        # Enable checkbox
+        # Header Section
+        header_layout = QVBoxLayout()
+        header_layout.setSpacing(2)
+        title_label = QLabel("HoverDesk")
+        title_label.setObjectName("titleLabel")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        subtitle_label = QLabel("Smart Desktop Icon Manager")
+        subtitle_label.setObjectName("subtitleLabel")
+        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        header_layout.addWidget(title_label)
+        header_layout.addWidget(subtitle_label)
+        layout.addLayout(header_layout)
+
+        # Enable Checkbox
         self.enable_cb = QCheckBox("Enable HoverDesk")
         self.enable_cb.setChecked(self.cfg["enabled"])
+        self.enable_cb.toggled.connect(self._on_enable_toggled)
         layout.addWidget(self.enable_cb)
 
-        # Idle time slider
-        idle_layout = QHBoxLayout()
-        self.idle_label = QLabel(f'Idle Time: {self.cfg["idle_time"]}s')
+        # Feature Container
+        self.features_widget = QWidget()
+        features_layout = QVBoxLayout(self.features_widget)
+        features_layout.setContentsMargins(0, 0, 0, 0)
+        features_layout.setSpacing(10)
+
+        # Mode Section
+        self.mode_group = QGroupBox("Mode Settings")
+        mode_layout = QVBoxLayout()
+        mode_layout.setContentsMargins(15, 20, 15, 15)
+        mode_layout.setSpacing(15)
+
+        # Normal Mode block
+        safe_container = QWidget()
+        safe_container.setStyleSheet("background: transparent;")
+        safe_layout = QVBoxLayout(safe_container)
+        safe_layout.setContentsMargins(0, 0, 0, 0)
+        safe_layout.setSpacing(4)
+        self.safe_radio = QRadioButton("Normal Mode (Safe)")
+        safe_desc = QLabel("Standard show/hide visibility.")
+        safe_desc.setStyleSheet("font-size: 12px; color: #9E9E9E; margin-left: 20px; background: transparent;")
+        safe_layout.addWidget(self.safe_radio)
+        safe_layout.addWidget(safe_desc)
+
+        # Fade Mode block
+        fade_container = QWidget()
+        fade_container.setStyleSheet("background: transparent;")
+        fade_mode_layout = QVBoxLayout(fade_container)
+        fade_mode_layout.setContentsMargins(0, 0, 0, 0)
+        fade_mode_layout.setSpacing(4)
+        self.fade_radio = QRadioButton("Fade Mode (Experimental)")
+        fade_desc = QLabel("Smooth alpha blending transitions.")
+        fade_desc.setStyleSheet("font-size: 12px; color: #9E9E9E; margin-left: 20px; background: transparent;")
+        fade_mode_layout.addWidget(self.fade_radio)
+        fade_mode_layout.addWidget(fade_desc)
+
+        self.mode_btn_group = QButtonGroup()
+        self.mode_btn_group.addButton(self.safe_radio)
+        self.mode_btn_group.addButton(self.fade_radio)
+
+        mode_layout.addWidget(safe_container)
+        mode_layout.addWidget(fade_container)
+
+        self.mode_group.setLayout(mode_layout)
+        features_layout.addWidget(self.mode_group)
+
+        # Idle Settings Section
+        self.idle_group = QGroupBox("Idle Settings")
+        idle_layout = QVBoxLayout()
+        idle_layout.setContentsMargins(15, 20, 15, 15)
+        idle_layout.setSpacing(10)
+
+        self.idle_label = QLabel(f'Idle Time: {self.cfg["idle_time"]} seconds')
         idle_layout.addWidget(self.idle_label)
-        
+
         self.idle_slider = QSlider(Qt.Orientation.Horizontal)
+        self.idle_slider.setMinimumHeight(24)
         self.idle_slider.setMinimum(1)
         self.idle_slider.setMaximum(30)
         self.idle_slider.setValue(self.cfg["idle_time"])
         self.idle_slider.valueChanged.connect(self._on_slider_change)
         idle_layout.addWidget(self.idle_slider)
-        
-        layout.addLayout(idle_layout)
 
-        # Mode Selection
-        mode_layout = QHBoxLayout()
-        mode_layout.addWidget(QLabel("Mode:"))
-        
-        self.safe_radio = QRadioButton("Normal Mode (Safe)")
-        self.fade_radio = QRadioButton("Fade Mode (Experimental)")
-        
-        self.mode_group = QButtonGroup()
-        self.mode_group.addButton(self.safe_radio)
-        self.mode_group.addButton(self.fade_radio)
-        
-        mode_layout.addWidget(self.safe_radio)
-        mode_layout.addWidget(self.fade_radio)
-        layout.addLayout(mode_layout)
+        self.idle_group.setLayout(idle_layout)
+        features_layout.addWidget(self.idle_group)
 
-        # Fade Duration Config (Hidden by default unless in experimental mode)
-        self.fade_widget = QWidget()
-        fade_layout = QHBoxLayout(self.fade_widget)
-        fade_layout.setContentsMargins(0, 0, 0, 0)
-        self.fade_label = QLabel(f'Fade Duration: {self.cfg.get("fade_duration", 400)}ms')
-        fade_layout.addWidget(self.fade_label)
-        
+        # Fade Settings Section
+        self.fade_group = QGroupBox("Fade Settings")
+        fade_s_layout = QVBoxLayout()
+        fade_s_layout.setContentsMargins(15, 20, 15, 15)
+        fade_s_layout.setSpacing(10)
+
+        self.fade_label = QLabel(f'Fade Duration: {self.cfg.get("fade_duration", 400)} ms')
+        fade_s_layout.addWidget(self.fade_label)
+
         self.fade_slider = QSlider(Qt.Orientation.Horizontal)
+        self.fade_slider.setMinimumHeight(24)
         self.fade_slider.setMinimum(100)
         self.fade_slider.setMaximum(1000)
         self.fade_slider.setSingleStep(50)
         self.fade_slider.setValue(self.cfg.get("fade_duration", 400))
         self.fade_slider.valueChanged.connect(self._on_fade_slider_change)
-        fade_layout.addWidget(self.fade_slider)
-        
-        layout.addWidget(self.fade_widget)
-        
-        # Connect mode toggle
+        fade_s_layout.addWidget(self.fade_slider)
+
+        self.fade_group.setLayout(fade_s_layout)
+        features_layout.addWidget(self.fade_group)
+        layout.addWidget(self.features_widget)
+        layout.addStretch()
+
+        # Connect mode toggle after setup
         self.safe_radio.toggled.connect(self._on_mode_toggled)
         self.fade_radio.toggled.connect(self._on_mode_toggled)
 
         # Apply defaults at the end
         if self.cfg.get("mode", "safe") == "experimental":
             self.fade_radio.setChecked(True)
+            self.fade_group.setVisible(True)
         else:
             self.safe_radio.setChecked(True)
+            self.fade_group.setVisible(False)
 
-        # Buttons
+        # Initial features disabled state
+        self._on_enable_toggled(self.cfg["enabled"])
+
+        # Control Buttons
         btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(15)
+        btn_layout.addStretch()
+        
         apply_btn = QPushButton('Apply')
+        apply_btn.setObjectName("applyBtn")
+        apply_btn.setMinimumHeight(40)
         apply_btn.clicked.connect(self._on_apply)
         btn_layout.addWidget(apply_btn)
 
-        hide_btn = QPushButton('Hide to Tray')
+        hide_btn = QPushButton('Minimize to Tray')
+        hide_btn.setMinimumHeight(40)
         hide_btn.clicked.connect(self.hide)
         btn_layout.addWidget(hide_btn)
 
         layout.addLayout(btn_layout)
         self.setLayout(layout)
 
+    def _on_enable_toggled(self, checked):
+        self.features_widget.setEnabled(checked)
+
     def _on_slider_change(self, val):
-        self.idle_label.setText(f'Idle Time: {val}s')
+        self.idle_label.setText(f'Idle Time: {val} seconds')
 
     def _on_fade_slider_change(self, val):
-        self.fade_label.setText(f'Fade Duration: {val}ms')
+        self.fade_label.setText(f'Fade Duration: {val} ms')
 
     def _on_mode_toggled(self):
-        self.fade_widget.setVisible(self.fade_radio.isChecked())
+        is_experimental = self.fade_radio.isChecked()
+        self.fade_group.setVisible(is_experimental)
 
     def _on_apply(self):
         self.cfg["enabled"] = self.enable_cb.isChecked()
@@ -307,6 +489,9 @@ class MainWindow(QWidget):
             self.engine.start()
         else:
             self.engine.stop()
+            
+        # Show tooltip
+        QToolTip.showText(QCursor.pos(), "Settings Applied Successfully!", self)
 
     def show_window(self):
         self.cfg = load_config()
@@ -320,10 +505,12 @@ class MainWindow(QWidget):
         
         if self.cfg.get("mode", "safe") == "experimental":
             self.fade_radio.setChecked(True)
+            self.fade_group.setVisible(True)
         else:
             self.safe_radio.setChecked(True)
+            self.fade_group.setVisible(False)
         
-        self._on_mode_toggled()
+        self._on_enable_toggled(self.cfg["enabled"])
         
         self.show()
         self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
@@ -331,8 +518,17 @@ class MainWindow(QWidget):
         self.activateWindow()
 
 if __name__ == '__main__':
+    # Set Windows AppUserModelID for proper taskbar grouping and icon
+    import ctypes
+    try:
+        myappid = 'hoverdesk.app.1.0'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except Exception:
+        pass
+
     # Phase 1: Single Instance Check
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon('icon.ico'))
     
     lock = QSharedMemory("HoverDeskSingleton")
     if lock.attach():
